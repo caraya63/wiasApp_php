@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/utils/otp.php';
-require __DIR__ . '/utils/mail_send.php';
+require_once __DIR__ . '/utils/otp.php';
+require_once __DIR__ . '/utils/mail_send.php';
 
 final class AuthController
 {

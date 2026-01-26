@@ -10,7 +10,7 @@ try {
     require __DIR__ . '/../src/Middleware.php';
     require __DIR__ . '/../src/AuthController.php';
     require __DIR__ . '/../src/FriendsController.php';
-    require __DIR__ . '/../src/WishlistsController.php';
+    require __DIR__ . '/../src/WishlistController.php';
 
     function mylog(string $msg) : void
     {
