@@ -172,7 +172,9 @@ class WishlistsController
                                               ORDER BY w.updated_at DESC LIMIT 200");
         $stVisible->execute([':uid' => $userId]);
         $visible = $stVisible->fetchAll(PDO::FETCH_ASSOC);
-
+        if (!is_array($mine)) $mine = [];
+        if (!is_array($shared)) $shared = [];
+        if (!is_array($visible)) $visible = [];
         Http::json(200, ['mine' => $mine, 'shared' => $shared, 'visible' => $visible]);
     }
 
