@@ -83,7 +83,7 @@ final class AuthController
         // Email único solo para activos: usamos email_active si aplicaste esa estrategia.
         // Si no, cambia a "WHERE email = :email AND deleted_at IS NULL"
         $query = "SELECT id " .
-                 " FROM user " .
+                 " FROM users " .
                  " WHERE email = :email AND deleted_at IS NULL LIMIT 1";
         $stmt = $pdo->prepare($query);
         $stmt->execute([':email' => $email]);
@@ -95,7 +95,7 @@ final class AuthController
 
         $pdo->beginTransaction();
         try {
-            $query = "INSERT INTO user (email, display_name, birth_date, birth_date_visibility, preferred_language, created_at, updated_at) " .
+            $query = "INSERT INTO users (email, display_name, birth_date, birth_date_visibility, preferred_language, created_at, updated_at) " .
                      " VALUES (:email, :display_name, :birth_date, :birth_vis, :lang, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))";
             $stmt = $pdo->prepare($query);
             $stmt->execute([
@@ -119,7 +119,7 @@ final class AuthController
             mylog("en register, token= " . $token);
             // devolver user
             $query = "SELECT id,email,display_name,preferred_language,validated " .
-                     " FROM user WHERE id=:id LIMIT 1";
+                     " FROM users WHERE id=:id LIMIT 1";
             $stmt = $pdo->prepare($query);
             $stmt->execute([':id' => $userId]);
             $userRow = $stmt->fetch();
@@ -161,7 +161,7 @@ final class AuthController
             $pdo = Db::pdo();
 
             $query = "SELECT u.id, u.email, u.display_name, u.preferred_language, ua.password_hash , u.validated" .
-                " FROM user u JOIN user_auth ua ON ua.user_id = u.id AND ua.provider='local' AND ua.deleted_at IS NULL " .
+                " FROM users u JOIN user_auth ua ON ua.user_id = u.id AND ua.provider='local' AND ua.deleted_at IS NULL " .
                 " WHERE u.email = :email AND u.deleted_at IS NULL  LIMIT 1 ";
             $stmt = $pdo->prepare($query);
             $stmt->execute([':email' => $email]);
@@ -204,7 +204,7 @@ final class AuthController
             $pdo = Db::pdo();
 
             $query = "SELECT u.id, ua.last_otp, UNIX_TIMESTAMP(ua.otp_expires) expires" .
-                " FROM user u JOIN user_auth ua ON ua.user_id = u.id AND ua.provider='local' AND ua.deleted_at IS NULL " .
+                " FROM userss u JOIN user_auth ua ON ua.user_id = u.id AND ua.provider='local' AND ua.deleted_at IS NULL " .
                 " WHERE u.email = :email AND u.deleted_at IS NULL  LIMIT 1 ";
             $stmt = $pdo->prepare($query);
             $stmt->execute([':email' => $email]);
@@ -216,7 +216,7 @@ final class AuthController
                 Http::unauthorized('invalid_credentials');
             }
             else {
-                $query = "UPDATE user SET validated=1 where id=:id;";
+                $query = "UPDATE users SET validated=1 where id=:id;";
                 $stmt = $pdo->prepare($query);
                 $stmt->execute([':id' => $row['id']]);
 
@@ -239,7 +239,7 @@ final class AuthController
 
         $pdo = Db::pdo();
         $query = "SELECT id,email,display_name,preferred_language, validated" .
-                 " FROM user WHERE id=:id AND deleted_at IS NULL LIMIT 1";
+                 " FROM users WHERE id=:id AND deleted_at IS NULL LIMIT 1";
         $stmt = $pdo->prepare($query);
         $stmt->execute([':id' => $userId]);
         $row = $stmt->fetch();
@@ -299,7 +299,7 @@ final class AuthController
         $pdo->beginTransaction();
         try {
             if (!empty($fields)) {
-                $sql = "UPDATE user " .
+                $sql = "UPDATE users " .
                             " SET " . implode(', ', $fields) . ", updated_at = CURRENT_TIMESTAMP(3) " .
                             " WHERE id = :id AND deleted_at IS NULL";
                 $stmt = $pdo->prepare($sql);
@@ -322,7 +322,7 @@ final class AuthController
             $pdo->commit();
 
             $stmt = $pdo->prepare("SELECT id,email,display_name,preferred_language " .
-                                            "FROM user WHERE id=:id AND deleted_at IS NULL LIMIT 1");
+                                            "FROM users WHERE id=:id AND deleted_at IS NULL LIMIT 1");
             $stmt->execute([':id' => $userId]);
             $row = $stmt->fetch();
 

@@ -19,7 +19,7 @@ final class FriendsController
                        u.display_name, u.email, u.birth_date, u.preferred_language,
                        f.created_at, f.updated_at
                 FROM friends f
-                JOIN user u ON u.id = CASE
+                JOIN users u ON u.id = CASE
                                         WHEN f.requester_user_id = :uid THEN f.addressee_user_id
                                         ELSE f.requester_user_id
                                       END
@@ -48,7 +48,7 @@ final class FriendsController
                          u.display_name, u.email,
                          f.status, f.created_at, f.updated_at
                   FROM friends f
-                  JOIN user u ON u.id = f.requester_user_id
+                  JOIN users u ON u.id = f.requester_user_id
                   WHERE f.deleted_at IS NULL
                     AND f.status = 'pending'
                     AND f.addressee_user_id = :uid
@@ -64,7 +64,7 @@ final class FriendsController
                           u.display_name, u.email,
                           f.status, f.created_at, f.updated_at
                    FROM friends f
-                   JOIN user u ON u.id = f.addressee_user_id
+                   JOIN users u ON u.id = f.addressee_user_id
                    WHERE f.deleted_at IS NULL
                      AND f.status = 'pending'
                      AND f.requester_user_id = :uid
@@ -103,7 +103,7 @@ final class FriendsController
             $pdo = DB::pdo();
 
             if ($toUserId <= 0 && $toEmail !== '') {
-                $st = $pdo->prepare("SELECT id FROM user WHERE email = :email AND deleted_at IS NULL LIMIT 1");
+                $st = $pdo->prepare("SELECT id FROM users WHERE email = :email AND deleted_at IS NULL LIMIT 1");
                 $st->execute([':email' => $toEmail]);
                 $row = $st->fetch(PDO::FETCH_ASSOC);
 

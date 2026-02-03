@@ -135,47 +135,57 @@ class WishlistsController
 
     public static function listWishlists(): void
     {
-        Middleware::requireAppSignature();
-        $userId = Middleware::requireAuthUserId();
-        $pdo = DB::pdo();
+        $userId = 0;
+        try {
+            Middleware::requireAppSignature();
+            $userId = Middleware::requireAuthUserId();
+            $pdo = DB::pdo();
 
-        // 1) Mis wishlists
-        $stMine = $pdo->prepare("SELECT id, owner_id, title, description, visibility, created_at, updated_at " .
-                                         "FROM wishlist
-                                          WHERE deleted_at IS NULL AND owner_id = :uid
-                                          ORDER BY updated_at DESC");
-        $stMine->execute([':uid' => $userId]);
-        $mine = $stMine->fetchAll(PDO::FETCH_ASSOC);
+            // 1) Mis wishlists
+            $stMine = $pdo->prepare("SELECT id, owner_id, title, description, visibility, created_at, updated_at " .
+                "FROM wishlist
+                                              WHERE deleted_at IS NULL AND owner_id = :uid
+                                              ORDER BY updated_at DESC");
+            $stMine->execute([':uid' => $userId]);
+            $mine = $stMine->fetchAll(PDO::FETCH_ASSOC);
+            //mylog("wishlists array mine: " . var_dump($mine));
+            // 2) Wishlists con permiso explícito (reader/editor)
+            $stPerm = $pdo->prepare("SELECT w.id, w.owner_id, w.title, w.description, w.visibility, w.created_at, w.updated_at,p.role " .
+                                                "FROM wishlist_permission p 
+                                                JOIN wishlist w ON w.id = p.wishlist_id
+                                                  WHERE p.deleted_at IS NULL AND w.deleted_at IS NULL AND p.user_id = :uid
+                                                  ORDER BY w.updated_at DESC");
+            $stPerm->execute([':uid' => $userId]);
+            $shared = $stPerm->fetchAll(PDO::FETCH_ASSOC);
 
-        // 2) Wishlists con permiso explícito (reader/editor)
-        $stPerm = $pdo->prepare("SELECT w.id, w.owner_id, w.title, w.description, w.visibility, w.created_at, w.updated_at,p.role " .
-                                         "FROM wishlist_permission p JOIN wishlist w ON w.id = p.wishlist_id
-                                          WHERE p.deleted_at IS NULL AND w.deleted_at IS NULL AND p.user_id = :uid
-                                          ORDER BY w.updated_at DESC");
-        $stPerm->execute([':uid' => $userId]);
-        $shared = $stPerm->fetchAll(PDO::FETCH_ASSOC);
-
-        // 3) Wishlists visibles por "friends" (owner = mis amigos) + public
-        // Nota: para no duplicar (mías o con permiso) usamos NOT EXISTS.
-        $stVisible = $pdo->prepare("SELECT w.id, w.owner_id, w.title, w.description, w.visibility, w.created_at, w.updated_at " .
-                                             "FROM wishlist w
-                                              WHERE w.deleted_at IS NULL AND w.owner_id <> :uid AND (w.visibility = 'public' 
-                                                  OR (w.visibility = 'friends' AND EXISTS (SELECT 1 FROM friends f
-                                                      WHERE f.deleted_at IS NULL AND f.status = 'accepted' AND (
-                                                          (f.requester_user_id = :uid AND f.addressee_user_id = w.owner_id) OR
-                                                          (f.requester_user_id = w.owner_id AND f.addressee_user_id = :uid)
+            // 3) Wishlists visibles por "friends" (owner = mis amigos) + public
+            // Nota: para no duplicar (mías o con permiso) usamos NOT EXISTS.
+            $stVisible = $pdo->prepare("SELECT w.id, w.owner_id, w.title, w.description, w.visibility, w.created_at, w.updated_at " .
+                "FROM wishlist w
+                                                  WHERE w.deleted_at IS NULL AND w.owner_id <> :uid AND (w.visibility = 'public' 
+                                                      OR (w.visibility = 'friends' AND 
+                                                        EXISTS (SELECT 1 FROM friends f
+                                                            WHERE f.deleted_at IS NULL AND f.status = 'accepted' AND (
+                                                              (f.requester_user_id = :uid AND f.addressee_user_id = w.owner_id) OR
+                                                              (f.requester_user_id = w.owner_id AND f.addressee_user_id = :uid)
+                                                            )
                                                         )
-                                                    )
-                                                  )
-                                                ) AND NOT EXISTS (SELECT 1 FROM wishlist_permission p
-                                                                WHERE p.deleted_at IS NULL AND p.wishlist_id = w.id AND p.user_id = :uid )
-                                              ORDER BY w.updated_at DESC LIMIT 200");
-        $stVisible->execute([':uid' => $userId]);
-        $visible = $stVisible->fetchAll(PDO::FETCH_ASSOC);
-        if (!is_array($mine)) $mine = [];
-        if (!is_array($shared)) $shared = [];
-        if (!is_array($visible)) $visible = [];
-        Http::json(200, ['mine' => $mine, 'shared' => $shared, 'visible' => $visible]);
+                                                      )
+                                                    ) AND NOT EXISTS (SELECT 1 FROM wishlist_permission p
+                                                                    WHERE p.deleted_at IS NULL AND p.wishlist_id = w.id AND p.user_id = :uid )
+                                                  ORDER BY w.updated_at DESC LIMIT 200");
+            $stVisible->execute([':uid' => $userId]);
+            $visible = $stVisible->fetchAll(PDO::FETCH_ASSOC);
+            if (!is_array($mine)) $mine = [];
+            //mylog("despues del if wishlists array mine: " . var_dump($mine));
+            if (!is_array($shared)) $shared = [];
+            if (!is_array($visible)) $visible = [];
+            Http::json(200, ['mine' => $mine, 'shared' => $shared, 'visible' => $visible]);
+        }
+        catch(Exception $e){
+            mylog("Error en listWishlists, " . $e->getMessage());
+            Http::json(422, ['error' => 'bad_response', 'message' => 'we could not load data for userid: '.$userId]);
+        }
     }
 
     public static function createWishlist( array $body): void
@@ -612,7 +622,7 @@ class WishlistsController
 
         $pdo = DB::pdo();
         $st = $pdo->prepare("SELECT p.user_id, p.role, p.created_at, p.updated_at,u.display_name, u.email " . "
-                                  FROM wishlist_permission p JOIN user u ON u.id = p.user_id
+                                  FROM wishlist_permission p JOIN users u ON u.id = p.user_id
                                   WHERE p.deleted_at IS NULL AND p.wishlist_id = :wid
                                   ORDER BY p.created_at DESC");
         $st->execute([':wid' => $wishlistId]);

@@ -95,7 +95,7 @@ final class SimpleJWT
             return $payload;
         }
         catch(Exception $e){
-            mylog("Error en simnpleJWT decode: " . $e->getMessage());
+            mylog("Error en simpleJWT decode: " . $e->getMessage());
             return [];
         }
     }

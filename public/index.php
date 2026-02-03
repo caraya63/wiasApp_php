@@ -2,7 +2,10 @@
 declare(strict_types=1);
 
 try {
-   // require __DIR__ . '/../vendor/autoload.php';
+
+    ini_set('display_errors', "0");
+    ini_set('log_errors', "1");
+    ini_set('error_log', __DIR__ . '/../src/php-error.log');
 
     require __DIR__ . '/../src/Config.php';
     require __DIR__ . '/../src/Db.php';
@@ -10,7 +13,7 @@ try {
     require __DIR__ . '/../src/Middleware.php';
     require __DIR__ . '/../src/AuthController.php';
     require __DIR__ . '/../src/FriendsController.php';
-    require __DIR__ . '/../src/WishlistsController.php';
+    require __DIR__ . '/../src/WishListsController.php';
 
     function mylog(string $msg) : void
     {
@@ -37,7 +40,7 @@ try {
     $uri = $_SERVER['REQUEST_URI'] ?? '/';
     //$path = strtok($uri, '?') ?: '/';
     $path = getPathAfterIndex();
-    mylog("entrada... method: " . $method . "  path: " . $path . "\n");
+    mylog("entrada... method: " . $method . "  path: " . $path . "  uri: " . $uri . "\n");
 
     /******************************************************************** */
     //SERVICIOS DE LOGIN Y REGISTRO
@@ -66,33 +69,33 @@ try {
     /******************************************************************** */
     // SERVICIOS DE "FRIENDS"
     /******************************************************************** */
-    if ($method === 'GET' && $uri === '/friends') {
+    if ($method === 'GET' && $path === '/friends') {
         FriendsController::listFriends();
         exit;
     }
 
-    if ($method === 'GET' && $uri === '/friends/requests') {
+    if ($method === 'GET' && $path === '/friends/requests') {
         FriendsController::listRequests();
         exit;
     }
 
-    if ($method === 'POST' && $uri === '/friends/requests') {
-        $body = Http::bodyJson();
+    if ($method === 'POST' && $path === '/friends/requests') {
+        $body = Http::jsonBody();
         FriendsController::createRequest($body);
         exit;
     }
 
-    if ($method === 'POST' && preg_match('#^/friends/requests/(\d+)/accept$#', $uri, $m)) {
+    if ($method === 'POST' && preg_match('#^/friends/requests/(\d+)/accept$#', $path, $m)) {
         FriendsController::acceptRequest( (int)$m[1]);
         exit;
     }
 
-    if ($method === 'POST' && preg_match('#^/friends/requests/(\d+)/reject$#', $uri, $m)) {
+    if ($method === 'POST' && preg_match('#^/friends/requests/(\d+)/reject$#', $path, $m)) {
         FriendsController::rejectRequest( (int)$m[1]);
         exit;
     }
 
-    if ($method === 'DELETE' && preg_match('#^/friends/(\d+)$#', $uri, $m)) {
+    if ($method === 'DELETE' && preg_match('#^/friends/(\d+)$#', $path, $m)) {
         FriendsController::deleteFriend( (int)$m[1]);
         exit;
     }
@@ -102,104 +105,104 @@ try {
     /******************************************************************** */
 
     // mis Wishlists y listas visibles
-    if ($method === 'GET' && $uri === '/wishlists') {
+    if ($method === 'GET' && $path === '/wishlists/mine') {
         WishlistsController::listWishlists();
         exit;
     }
 
     // crear lista
-    if ($method === 'POST' && $uri === '/wishlists') {
-        $body = Http::bodyJson();
+    if ($method === 'POST' && $path === '/wishlists') {
+        $body = Http::jsonBody();
         WishlistsController::createWishlist( $body);
         exit;
     }
 
     //detalle de datos de lista
-    if ($method === 'GET' && preg_match('#^/wishlists/(\d+)$#', $uri, $m)) {
+    if ($method === 'GET' && preg_match('#^/wishlists/(\d+)$#', $path, $m)) {
         WishlistsController::getWishlist((int)$m[1]);
         exit;
     }
 
     //renombrar, actualizar lista
-    if ($method === 'PATCH' && preg_match('#^/wishlists/(\d+)$#', $uri, $m)) {
-        $body = Http::bodyJson();
+    if ($method === 'PATCH' && preg_match('#^/wishlists/(\d+)$#', $path, $m)) {
+        $body = Http::jsonBody();
         WishlistsController::updateWishlist((int)$m[1], $body);
         exit;
     }
 
     // "borrar" lista
-    if ($method === 'DELETE' && preg_match('#^/wishlists/(\d+)$#', $uri, $m)) {
+    if ($method === 'DELETE' && preg_match('#^/wishlists/(\d+)$#', $path, $m)) {
         WishlistsController::deleteWishlist( (int)$m[1]);
         exit;
     }
 
     // Items de lista
-    if ($method === 'GET' && preg_match('#^/wishlists/(\d+)/items$#', $uri, $m)) {
+    if ($method === 'GET' && preg_match('#^/wishlists/(\d+)/items$#', $path, $m)) {
         WishlistsController::listItems( (int)$m[1]);
         exit;
     }
 
     // Agregar item a lista (texto/imagen/link + visibilidad)
-    if ($method === 'POST' && preg_match('#^/wishlists/(\d+)/items$#', $uri, $m)) {
-        $body = Http::bodyJson();
+    if ($method === 'POST' && preg_match('#^/wishlists/(\d+)/items$#', $path, $m)) {
+        $body = Http::jsonBody();
         WishlistsController::createItem( (int)$m[1], $body);
         exit;
     }
 
     //Actualizar Item de lista
-    if ($method === 'PATCH' && preg_match('#^/wishlists/(\d+)/items/(\d+)$#', $uri, $m)) {
-        $body = Http::bodyJson();
+    if ($method === 'PATCH' && preg_match('#^/wishlists/(\d+)/items/(\d+)$#', $path, $m)) {
+        $body = Http::jsonBody();
         WishlistsController::updateItem((int)$m[1], (int)$m[2], $body);
         exit;
     }
 
     //"Eliminar" item de lista
-    if ($method === 'DELETE' && preg_match('#^/wishlists/(\d+)/items/(\d+)$#', $uri, $m)) {
+    if ($method === 'DELETE' && preg_match('#^/wishlists/(\d+)/items/(\d+)$#', $path, $m)) {
         WishlistsController::deleteItem( (int)$m[1], (int)$m[2]);
         exit;
     }
 
     // Permissions (compartir con usuarios)
-    if ($method === 'POST' && preg_match('#^/wishlists/(\d+)/share$#', $uri, $m)) {
-        $body = Http::bodyJson();
+    if ($method === 'POST' && preg_match('#^/wishlists/(\d+)/share$#', $path, $m)) {
+        $body = Http::jsonBody();
         WishlistsController::shareWishlist((int)$m[1], $body);
         exit;
     }
 
-    if ($method === 'GET' && preg_match('#^/wishlists/(\d+)/share$#', $uri, $m)) {
+    if ($method === 'GET' && preg_match('#^/wishlists/(\d+)/share$#', $path, $m)) {
         WishlistsController::listShares((int)$m[1]);
         exit;
     }
 
-    if ($method === 'DELETE' && preg_match('#^/wishlists/(\d+)/share/(\d+)$#', $uri, $m)) {
+    if ($method === 'DELETE' && preg_match('#^/wishlists/(\d+)/share/(\d+)$#', $path, $m)) {
         WishlistsController::unshareWishlist((int)$m[1], (int)$m[2]);
         exit;
     }
 
 // Share links (token público readonly)
-    if ($method === 'POST' && preg_match('#^/wishlists/(\d+)/share-links$#', $uri, $m)) {
-        $body = Http::bodyJson();
+    if ($method === 'POST' && preg_match('#^/wishlists/(\d+)/share-links$#', $path, $m)) {
+        $body = Http::jsonBody();
         WishlistsController::createShareLink( (int)$m[1], $body);
         exit;
     }
 
-    if ($method === 'GET' && preg_match('#^/wishlists/(\d+)/share-links$#', $uri, $m)) {
+    if ($method === 'GET' && preg_match('#^/wishlists/(\d+)/share-links$#', $path, $m)) {
         WishlistsController::listShareLinks( (int)$m[1]);
         exit;
     }
 
-    if ($method === 'DELETE' && preg_match('#^/wishlists/(\d+)/share-links/(\d+)$#', $uri, $m)) {
+    if ($method === 'DELETE' && preg_match('#^/wishlists/(\d+)/share-links/(\d+)$#', $path, $m)) {
         WishlistsController::revokeShareLink( (int)$m[1], (int)$m[2]);
         exit;
     }
 
     // Acceso por token (sin auth)
-    if ($method === 'GET' && preg_match('#^/share/wishlists/([a-fA-F0-9]{64})$#', $uri, $m)) {
+    if ($method === 'GET' && preg_match('#^/share/wishlists/([a-fA-F0-9]{64})$#', $path, $m)) {
         WishlistsController::getWishlistByToken($m[1]);
         exit;
     }
 
-    if ($method === 'GET' && preg_match('#^/share/wishlists/([a-fA-F0-9]{64})/items$#', $uri, $m)) {
+    if ($method === 'GET' && preg_match('#^/share/wishlists/([a-fA-F0-9]{64})/items$#', $path, $m)) {
         WishlistsController::listItemsByToken($m[1]);
         exit;
     }

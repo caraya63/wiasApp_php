@@ -74,11 +74,14 @@ final class Middleware
 
             $token = $m[1];
             mylog("en Middleware.requireAuthUserId, token: ".$token);
+
             try {
-                $decoded = SimpleJWT::decode($token, Config::JWT_SECRET, 30,true); //30segs
-                $uid = (int)$decoded["sub"] ?? 0;
-                mylog('en Middleware.requireAuthUserId, devuelve userid? '.json_encode($decoded) . " sub--> ".$decoded["sub"]. "  uid: " .$uid);
-                if ($uid <= 0) Http::unauthorized('invalid_token');
+                $decoded = SimpleJWT::decode($token, Config::JWT_SECRET, 30, true);
+                $uid = isset($decoded['sub']) ? (int)$decoded['sub'] : 0;
+                mylog('en Middleware... data: ' . json_encode($decoded) . " uid: " . $uid);
+                if ($uid <= 0) {
+                    Http::unauthorized('invalid_token'); // Esto hace exit;
+                }
                 return $uid;
             } catch (\Throwable $e) {
                 mylog("Error en Middleware.requireAuthUserId ".$e->getMessage());
