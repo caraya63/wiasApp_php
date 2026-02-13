@@ -14,7 +14,7 @@ class WishlistsController
     {
         $pdo = DB::pdo();
         $st = $pdo->prepare("SELECT " .
-            "* FROM wishlist WHERE id = :id AND deleted_at IS NULL LIMIT 1");
+            "* FROM wishlist WHERE id = :id AND deleted=0 LIMIT 1");
         $st->execute([':id' => $wishlistId]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
@@ -28,7 +28,7 @@ class WishlistsController
 
         $st = $pdo->prepare("SELECT 1 " .
                                       "FROM wishlist_permission
-                                      WHERE deleted_at IS NULL
+                                      WHERE deleted=0
                                         AND wishlist_id = ?
                                         AND user_id = ?
                                         AND role IN ($in)
@@ -44,7 +44,7 @@ class WishlistsController
         $pdo = DB::pdo();
         $st = $pdo->prepare("SELECT role " .
                                       "FROM wishlist_permission
-                                      WHERE deleted_at IS NULL AND wishlist_id = :wid AND user_id = :uid
+                                      WHERE deleted=0 AND wishlist_id = :wid AND user_id = :uid
                                       LIMIT 1");
         $st->execute([':wid' => $wishlistId, ':uid' => $userId]);
         $role = $st->fetchColumn();
@@ -56,7 +56,7 @@ class WishlistsController
         $pdo = DB::pdo();
         $st = $pdo->prepare("SELECT 1 " .
                                      "FROM friends
-                                      WHERE deleted_at IS NULL
+                                      WHERE deleted=0
                                         AND status = 'accepted'
                                         AND (
                                           (requester_user_id = :a AND addressee_user_id = :b)
@@ -143,8 +143,8 @@ class WishlistsController
 
             // 1) Mis wishlists
             $stMine = $pdo->prepare("SELECT id, owner_id, title, description, visibility, created_at, updated_at " .
-                "FROM wishlist
-                                              WHERE deleted_at IS NULL AND owner_id = :uid
+                                              "FROM wishlist
+                                              WHERE deleted=0 AND owner_id = :uid
                                               ORDER BY updated_at DESC");
             $stMine->execute([':uid' => $userId]);
             $mine = $stMine->fetchAll(PDO::FETCH_ASSOC);
@@ -152,8 +152,8 @@ class WishlistsController
             // 2) Wishlists con permiso explícito (reader/editor)
             $stPerm = $pdo->prepare("SELECT w.id, w.owner_id, w.title, w.description, w.visibility, w.created_at, w.updated_at,p.role " .
                                                 "FROM wishlist_permission p 
-                                                JOIN wishlist w ON w.id = p.wishlist_id
-                                                  WHERE p.deleted_at IS NULL AND w.deleted_at IS NULL AND p.user_id = :uid
+                                                JOIN wishlist w ON w.id = p.wishlist_id AND NOT(w.owner_id = :uid)
+                                                  WHERE p.deleted=0 AND w.deleted=0 AND p.user_id = :uid 
                                                   ORDER BY w.updated_at DESC");
             $stPerm->execute([':uid' => $userId]);
             $shared = $stPerm->fetchAll(PDO::FETCH_ASSOC);
@@ -161,18 +161,18 @@ class WishlistsController
             // 3) Wishlists visibles por "friends" (owner = mis amigos) + public
             // Nota: para no duplicar (mías o con permiso) usamos NOT EXISTS.
             $stVisible = $pdo->prepare("SELECT w.id, w.owner_id, w.title, w.description, w.visibility, w.created_at, w.updated_at " .
-                "FROM wishlist w
-                                                  WHERE w.deleted_at IS NULL AND w.owner_id <> :uid AND (w.visibility = 'public' 
+                                                  "FROM wishlist w
+                                                  WHERE w.deleted=0 AND w.owner_id <> :uid AND (w.visibility = 'public' 
                                                       OR (w.visibility = 'friends' AND 
                                                         EXISTS (SELECT 1 FROM friends f
-                                                            WHERE f.deleted_at IS NULL AND f.status = 'accepted' AND (
+                                                            WHERE f.deleted=0 AND f.status = 'accepted' AND (
                                                               (f.requester_user_id = :uid AND f.addressee_user_id = w.owner_id) OR
                                                               (f.requester_user_id = w.owner_id AND f.addressee_user_id = :uid)
                                                             )
                                                         )
                                                       )
                                                     ) AND NOT EXISTS (SELECT 1 FROM wishlist_permission p
-                                                                    WHERE p.deleted_at IS NULL AND p.wishlist_id = w.id AND p.user_id = :uid )
+                                                                    WHERE p.deleted=0 AND p.wishlist_id = w.id AND p.user_id = :uid )
                                                   ORDER BY w.updated_at DESC LIMIT 200");
             $stVisible->execute([':uid' => $userId]);
             $visible = $stVisible->fetchAll(PDO::FETCH_ASSOC);
@@ -281,7 +281,7 @@ class WishlistsController
         $pdo = DB::pdo();
         $st = $pdo->prepare("UPDATE wishlist " .
                                     "SET title = :title,description = :desc,visibility = :vis,updated_at = " . self::nowExpr() .
-                                    "WHERE id = :id AND deleted_at IS NULL");
+                                    "WHERE id = :id AND deleted=0");
         $st->execute([
             ':title' => $title,
             ':desc' => $description,
@@ -310,19 +310,19 @@ class WishlistsController
 
         $pdo->prepare("UPDATE wishlist " .
                                 " SET deleted_at = " . self::nowExpr() . ", updated_at = " . self::nowExpr() .
-                                " WHERE id = :id AND deleted_at IS NULL")->execute([':id' => $wishlistId]);
+                                " WHERE id = :id AND deleted=0")->execute([':id' => $wishlistId]);
 
         $pdo->prepare("UPDATE wishlist_item " .
                               " SET deleted_at = " . self::nowExpr() . ", updated_at = " . self::nowExpr() .
-                              " WHERE wishlist_id = :id AND deleted_at IS NULL")->execute([':id' => $wishlistId]);
+                              " WHERE wishlist_id = :id AND deleted=0")->execute([':id' => $wishlistId]);
 
         $pdo->prepare("UPDATE wishlist_permission " .
                               " SET deleted_at = " . self::nowExpr() . ", updated_at = " . self::nowExpr() .
-                              " WHERE wishlist_id = :id AND deleted_at IS NULL")->execute([':id' => $wishlistId]);
+                              " WHERE wishlist_id = :id AND deleted=0")->execute([':id' => $wishlistId]);
 
         $pdo->prepare("UPDATE wishlist_share_link " .
                               " SET deleted_at = " . self::nowExpr() . ", updated_at = " . self::nowExpr() .
-                              " WHERE wishlist_id = :id AND deleted_at IS NULL")->execute([':id' => $wishlistId]);
+                              " WHERE wishlist_id = :id AND deleted=0")->execute([':id' => $wishlistId]);
 
         Http::json(200, ['deleted' => true]);
     }
@@ -358,7 +358,7 @@ class WishlistsController
         $st = $pdo->prepare("SELECT id, wishlist_id, title, image_url, link_url, price_amount, price_currency, " . "
                                              notes, priority, visibility, is_gifted, created_at, updated_at
                                       FROM wishlist_item
-                                      WHERE deleted_at IS NULL
+                                      WHERE deleted=0
                                         AND wishlist_id = :wid
                                         $whereExtra
                                       ORDER BY updated_at DESC");
@@ -454,7 +454,7 @@ class WishlistsController
         $pdo = DB::pdo();
         $st = $pdo->prepare("SELECT * " .
                                     " FROM wishlist_item
-                                      WHERE id = :id AND wishlist_id = :wid AND deleted_at IS NULL LIMIT 1 ");
+                                      WHERE id = :id AND wishlist_id = :wid AND deleted=0 LIMIT 1 ");
         $st->execute([':id' => $itemId, ':wid' => $wishlistId]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
 
@@ -519,7 +519,7 @@ class WishlistsController
         }
 
         $sql = "UPDATE wishlist_item " . " SET " . implode(", ", $fields) . ",updated_at = " . self::nowExpr() . "
-                  WHERE id = :id AND wishlist_id = :wid AND deleted_at IS NULL";
+                  WHERE id = :id AND wishlist_id = :wid AND deleted=0";
         $upd = $pdo->prepare($sql);
         $upd->execute($params);
 
@@ -544,7 +544,7 @@ class WishlistsController
         $pdo = DB::pdo();
         $pdo->prepare("UPDATE wishlist_item " . "
                               SET deleted_at = " . self::nowExpr() . ", updated_at = " . self::nowExpr() . "
-                              WHERE id = :id AND wishlist_id = :wid AND deleted_at IS NULL
+                              WHERE id = :id AND wishlist_id = :wid AND deleted=0
                             ")->execute([':id' => $itemId, ':wid' => $wishlistId]);
 
         Http::json(200, ['deleted' => true]);
@@ -623,7 +623,7 @@ class WishlistsController
         $pdo = DB::pdo();
         $st = $pdo->prepare("SELECT p.user_id, p.role, p.created_at, p.updated_at,u.display_name, u.email " . "
                                   FROM wishlist_permission p JOIN users u ON u.id = p.user_id
-                                  WHERE p.deleted_at IS NULL AND p.wishlist_id = :wid
+                                  WHERE p.deleted=0 AND p.wishlist_id = :wid
                                   ORDER BY p.created_at DESC");
         $st->execute([':wid' => $wishlistId]);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -648,7 +648,7 @@ class WishlistsController
         $pdo = DB::pdo();
         $pdo->prepare("UPDATE wishlist_permission " . "
                               SET deleted_at = " . self::nowExpr() . ", updated_at = " . self::nowExpr() . "
-                              WHERE wishlist_id = :wid AND user_id = :uid AND deleted_at IS NULL
+                              WHERE wishlist_id = :wid AND user_id = :uid AND deleted=0
                             ")->execute([':wid' => $wishlistId, ':uid' => $withUserId]);
 
         Http::json(200, ['deleted' => true]);
@@ -711,7 +711,7 @@ class WishlistsController
         $pdo = DB::pdo();
         $st = $pdo->prepare("SELECT id, token, role, expires_at, revoked_at, created_by, created_at, updated_at " . "
                                       FROM wishlist_share_link
-                                      WHERE deleted_at IS NULL AND wishlist_id = :wid
+                                      WHERE deleted=0 AND wishlist_id = :wid
                                       ORDER BY created_at DESC");
         $st->execute([':wid' => $wishlistId]);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -735,7 +735,7 @@ class WishlistsController
 
         $pdo = DB::pdo();
         $pdo->prepare("UPDATE " . " wishlist_share_link SET revoked_at = " . self::nowExpr() . ", updated_at = " . self::nowExpr() . "
-                                WHERE id = :id AND wishlist_id = :wid AND deleted_at IS NULL")->execute([':id' => $shareLinkId, ':wid' => $wishlistId]);
+                                WHERE id = :id AND wishlist_id = :wid AND deleted=0")->execute([':id' => $shareLinkId, ':wid' => $wishlistId]);
 
         Http::json(200, ['revoked' => true]);
     }
@@ -749,7 +749,7 @@ class WishlistsController
         $pdo = DB::pdo();
         $st = $pdo->prepare("SELECT sl.*, w.id AS wishlist_id_real, w.owner_id, w.title, w.description, w.visibility, w.created_at, w.updated_at " . "
                                   FROM wishlist_share_link sl JOIN wishlist w ON w.id = sl.wishlist_id
-                                  WHERE sl.token = :tok AND sl.deleted_at IS NULL AND w.deleted_at IS NULL
+                                  WHERE sl.token = :tok AND sl.deleted=0 AND w.deleted=0
                                   LIMIT 1");
         $st->execute([':tok' => $token]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
@@ -781,7 +781,7 @@ class WishlistsController
         $pdo = DB::pdo();
         $st = $pdo->prepare("SELECT sl.*, w.id AS wishlist_id_real " . "
                                       FROM wishlist_share_link sl JOIN wishlist w ON w.id = sl.wishlist_id
-                                      WHERE sl.token = :tok AND sl.deleted_at IS NULL AND w.deleted_at IS NULL
+                                      WHERE sl.token = :tok AND sl.deleted=0 AND w.deleted=0
                                       LIMIT 1");
         $st->execute([':tok' => $token]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
@@ -797,7 +797,7 @@ class WishlistsController
         $it = $pdo->prepare("SELECT id, wishlist_id, title, image_url, link_url, price_amount, price_currency, ". "
                                              notes, priority, visibility, is_gifted, created_at, updated_at
                                       FROM wishlist_item
-                                      WHERE deleted_at IS NULL AND wishlist_id = :wid AND visibility <> 'private'
+                                      WHERE deleted=0 AND wishlist_id = :wid AND visibility <> 'private'
                                       ORDER BY updated_at DESC ");
         $it->execute([':wid' => $wishlistId]);
         $items = $it->fetchAll(PDO::FETCH_ASSOC);

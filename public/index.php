@@ -7,6 +7,7 @@ try {
     ini_set('log_errors', "1");
     ini_set('error_log', __DIR__ . '/../src/php-error.log');
 
+    require __DIR__ . '/../src/Mailer.php';
     require __DIR__ . '/../src/Config.php';
     require __DIR__ . '/../src/Db.php';
     require __DIR__ . '/../src/Http.php';
@@ -40,7 +41,16 @@ try {
     $uri = $_SERVER['REQUEST_URI'] ?? '/';
     //$path = strtok($uri, '?') ?: '/';
     $path = getPathAfterIndex();
-    mylog("entrada... method: " . $method . "  path: " . $path . "  uri: " . $uri . "\n");
+    mylog("\nentrada... method: " . $method . "  path: " . $path . "  uri: " . $uri . "\n");
+
+    /******************************************************************** */
+    // LINK PREVIEW (unfurl) - backend
+    /******************************************************************** */
+    if ($method === 'GET' && $path === '/link-preview') {
+        require __DIR__ . '/../src/utils/link_preview.php';
+        exit;
+    }
+
 
     /******************************************************************** */
     //SERVICIOS DE LOGIN Y REGISTRO

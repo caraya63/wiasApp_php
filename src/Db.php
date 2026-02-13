@@ -16,9 +16,9 @@ final class Db
             Config::DB_NAME
         );
 
-        self::$pdo = new \PDO($dsn, Config::DB_USER, Config::DB_PASS, [
-            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+        self::$pdo = new PDO($dsn, Config::DB_USER, Config::DB_PASS, [
+            PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
         ]);
 
         return self::$pdo;

@@ -23,7 +23,7 @@ final class FriendsController
                                         WHEN f.requester_user_id = :uid THEN f.addressee_user_id
                                         ELSE f.requester_user_id
                                       END
-                WHERE f.deleted_at IS NULL
+                WHERE f.deleted=0
                   AND f.status = 'accepted'
                   AND (:uid IN (f.requester_user_id, f.addressee_user_id))
                 ORDER BY u.display_name ASC";
@@ -49,7 +49,7 @@ final class FriendsController
                          f.status, f.created_at, f.updated_at
                   FROM friends f
                   JOIN users u ON u.id = f.requester_user_id
-                  WHERE f.deleted_at IS NULL
+                  WHERE f.deleted=0
                     AND f.status = 'pending'
                     AND f.addressee_user_id = :uid
                   ORDER BY f.created_at DESC";
@@ -65,7 +65,7 @@ final class FriendsController
                           f.status, f.created_at, f.updated_at
                    FROM friends f
                    JOIN users u ON u.id = f.addressee_user_id
-                   WHERE f.deleted_at IS NULL
+                   WHERE f.deleted=0
                      AND f.status = 'pending'
                      AND f.requester_user_id = :uid
                    ORDER BY f.created_at DESC";
@@ -77,6 +77,7 @@ final class FriendsController
         Http::json(200, ['incoming' => $incoming, 'outgoing' => $outgoing]);
     }
 
+    /*
     public static function createRequest(array $body): void
     {
         try {
@@ -103,7 +104,7 @@ final class FriendsController
             $pdo = DB::pdo();
 
             if ($toUserId <= 0 && $toEmail !== '') {
-                $st = $pdo->prepare("SELECT id FROM users WHERE email = :email AND deleted_at IS NULL LIMIT 1");
+                $st = $pdo->prepare("SELECT id FROM users WHERE email = :email AND deleted=0 LIMIT 1");
                 $st->execute([':email' => $toEmail]);
                 $row = $st->fetch(PDO::FETCH_ASSOC);
 
@@ -122,7 +123,7 @@ final class FriendsController
             $check = $pdo->prepare(
                 "SELECT * 
                          FROM friends
-                         WHERE deleted_at IS NULL
+                         WHERE deleted=0
                            AND ((requester_user_id = :a AND addressee_user_id = :b)
                              OR (requester_user_id = :b AND addressee_user_id = :a))
                          LIMIT 1"
@@ -152,6 +153,124 @@ final class FriendsController
             Http::json(201, ['requestId' => 0, 'status' => 'not inserted']);
         }
     }
+    */
+    public static function createRequest(array $body): void
+    {
+        try {
+            mylog("en create request");
+            Middleware::requireAppSignature();
+            $userId = Middleware::requireAuthUserId();
+
+            $toUserId = isset($body['toUserId']) ? (int)$body['toUserId'] : 0;
+
+            $toEmail = '';
+            if (isset($body['toEmail'])) $toEmail = trim((string)$body['toEmail']);
+            elseif (isset($body['email'])) $toEmail = trim((string)$body['email']);
+
+            if ($toUserId <= 0 && $toEmail === '') {
+                Http::json(400, ['error' => 'bad_request', 'message' => 'toUserId or toEmail required']);
+                return;
+            }
+
+            $pdo = DB::pdo();
+
+            // Datos del solicitante (para el email)
+            $stMe = $pdo->prepare("SELECT display_name, email FROM users WHERE id=:id AND deleted=0 LIMIT 1");
+            $stMe->execute([':id' => $userId]);
+            $me = $stMe->fetch(PDO::FETCH_ASSOC) ?: ['display_name' => 'Alguien', 'email' => ''];
+
+            $targetUser = null;
+
+            if ($toUserId <= 0 && $toEmail !== '') {
+                $st = $pdo->prepare("SELECT id, display_name, email FROM users WHERE email = :email AND deleted=0 LIMIT 1");
+                $st->execute([':email' => $toEmail]);
+                $targetUser = $st->fetch(PDO::FETCH_ASSOC);
+
+                if (!$targetUser) {
+                    // ✅ NO existe usuario: enviar INVITACIÓN
+                    $inviteLink = (Config::APP_URL ?? 'https://todoit.cl') . "/download"; // ajusta a tu landing/store
+                    $subject = "Te invitaron a WISH_APP";
+                    $html = "
+                    <p>Hola,</p>
+                    <p><b>{$me['display_name']}</b> ({$me['email']}) te invitó a unirte a <b>Wish_app</b>.</p>
+                    <p>Descárgala o entra aquí: <a href='{$inviteLink}'>{$inviteLink}</a></p>
+                ";
+
+                    $sent = Mailer::send($toEmail, $subject, $html);
+
+                    Http::json(200, [
+                        'status' => 'invited',
+                        'emailSent' => $sent
+                    ]);
+                    return;
+                }
+
+                $toUserId = (int)$targetUser['id'];
+            } else if ($toUserId > 0) {
+                $st = $pdo->prepare("SELECT id, display_name, email FROM users WHERE id = :id AND deleted=0 LIMIT 1");
+                $st->execute([':id' => $toUserId]);
+                $targetUser = $st->fetch(PDO::FETCH_ASSOC);
+            }
+
+            if ($toUserId === $userId) {
+                Http::json(400, ['error' => 'bad_request', 'message' => 'cannot_friend_self']);
+                return;
+            }
+
+            // Evitar duplicados
+            $check = $pdo->prepare(
+                "SELECT * 
+             FROM friends
+             WHERE deleted=0
+               AND ((requester_user_id = :a AND addressee_user_id = :b)
+                 OR (requester_user_id = :b AND addressee_user_id = :a))
+             LIMIT 1"
+            );
+            $check->execute([':a' => $userId, ':b' => $toUserId]);
+            $existing = $check->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                if (($existing['status'] ?? '') === 'accepted') {
+                    Http::json(409, ['error' => 'conflict', 'message' => 'already_friends']);
+                    return;
+                }
+                Http::json(409, ['error' => 'conflict', 'message' => 'request_already_exists', 'request' => $existing]);
+                return;
+            }
+
+            // Insert request
+            $ins = $pdo->prepare(
+                "INSERT INTO friends (requester_user_id, addressee_user_id, status, created_at, updated_at)
+             VALUES (:req, :add, 'pending', NOW(), NOW())"
+            );
+            $ins->execute([':req' => $userId, ':add' => $toUserId]);
+
+            $requestId = (int)$pdo->lastInsertId();
+
+            // ✅ Usuario existe: enviar NOTIFICACIÓN
+            $sent = false;
+            if ($targetUser && !empty($targetUser['email'])) {
+                $subject = "Nueva solicitud de amistad en TodoIt";
+                $link = (Config::APP_URL ?? 'https://todoit.cl') . "/app"; // ajusta a deep link o ruta
+                $html = "
+                <p>Hola {$targetUser['display_name']},</p>
+                <p><b>{$me['display_name']}</b> te envió una solicitud de amistad.</p>
+                <p>Abre la app para aceptarla: <a href='{$link}'>{$link}</a></p>
+            ";
+                $sent = Mailer::send($targetUser['email'], $subject, $html);
+            }
+
+            Http::json(201, [
+                'requestId' => $requestId,
+                'status' => 'pending',
+                'emailSent' => $sent
+            ]);
+        }
+        catch(Exception $e){
+            mylog("CreateRequest error : " . $e->getMessage());
+            Http::json(500, ['error' => 'server_error', 'message' => 'failed_to_create_request']);
+        }
+    }
 
     public static function acceptRequest(int $requestId): void
     {
@@ -160,7 +279,7 @@ final class FriendsController
         $userId = Middleware::requireAuthUserId();
         $pdo = DB::pdo();
 
-        $st = $pdo->prepare("SELECT * FROM friends WHERE id = :id AND deleted_at IS NULL LIMIT 1");
+        $st = $pdo->prepare("SELECT * FROM friends WHERE id = :id AND deleted=0 LIMIT 1");
         $st->execute([':id' => $requestId]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
 
@@ -192,7 +311,7 @@ final class FriendsController
         $userId = Middleware::requireAuthUserId();
         $pdo = DB::pdo();
 
-        $st = $pdo->prepare("SELECT * FROM friends WHERE id = :id AND deleted_at IS NULL LIMIT 1");
+        $st = $pdo->prepare("SELECT * FROM friends WHERE id = :id AND deleted=0 LIMIT 1");
         $st->execute([':id' => $requestId]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
 
@@ -224,7 +343,7 @@ final class FriendsController
         $userId = Middleware::requireAuthUserId();
         $pdo = DB::pdo();
 
-        $st = $pdo->prepare("SELECT * FROM friends WHERE id = :id AND deleted_at IS NULL LIMIT 1");
+        $st = $pdo->prepare("SELECT * FROM friends WHERE id = :id AND deleted=0 LIMIT 1");
         $st->execute([':id' => $friendRowId]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
 

@@ -81,10 +81,10 @@ final class AuthController
         $pdo = Db::pdo();
 
         // Email único solo para activos: usamos email_active si aplicaste esa estrategia.
-        // Si no, cambia a "WHERE email = :email AND deleted_at IS NULL"
+        // Si no, cambia a "WHERE email = :email AND deleted=0"
         $query = "SELECT id " .
                  " FROM users " .
-                 " WHERE email = :email AND deleted_at IS NULL LIMIT 1";
+                 " WHERE email = :email AND deleted=0 LIMIT 1";
         $stmt = $pdo->prepare($query);
         $stmt->execute([':email' => $email]);
         if ($stmt->fetch()) {
@@ -161,8 +161,8 @@ final class AuthController
             $pdo = Db::pdo();
 
             $query = "SELECT u.id, u.email, u.display_name, u.preferred_language, ua.password_hash , u.validated" .
-                " FROM users u JOIN user_auth ua ON ua.user_id = u.id AND ua.provider='local' AND ua.deleted_at IS NULL " .
-                " WHERE u.email = :email AND u.deleted_at IS NULL  LIMIT 1 ";
+                " FROM users u JOIN user_auth ua ON ua.user_id = u.id AND ua.provider='local' AND ua.deleted=0 " .
+                " WHERE u.email = :email AND u.deleted=0  LIMIT 1 ";
             $stmt = $pdo->prepare($query);
             $stmt->execute([':email' => $email]);
 
@@ -204,8 +204,8 @@ final class AuthController
             $pdo = Db::pdo();
 
             $query = "SELECT u.id, ua.last_otp, UNIX_TIMESTAMP(ua.otp_expires) expires" .
-                " FROM userss u JOIN user_auth ua ON ua.user_id = u.id AND ua.provider='local' AND ua.deleted_at IS NULL " .
-                " WHERE u.email = :email AND u.deleted_at IS NULL  LIMIT 1 ";
+                " FROM userss u JOIN user_auth ua ON ua.user_id = u.id AND ua.provider='local' AND ua.deleted=0 " .
+                " WHERE u.email = :email AND u.deleted=0  LIMIT 1 ";
             $stmt = $pdo->prepare($query);
             $stmt->execute([':email' => $email]);
 
@@ -239,7 +239,7 @@ final class AuthController
 
         $pdo = Db::pdo();
         $query = "SELECT id,email,display_name,preferred_language, validated" .
-                 " FROM users WHERE id=:id AND deleted_at IS NULL LIMIT 1";
+                 " FROM users WHERE id=:id AND deleted=0 LIMIT 1";
         $stmt = $pdo->prepare($query);
         $stmt->execute([':id' => $userId]);
         $row = $stmt->fetch();
@@ -301,7 +301,7 @@ final class AuthController
             if (!empty($fields)) {
                 $sql = "UPDATE users " .
                             " SET " . implode(', ', $fields) . ", updated_at = CURRENT_TIMESTAMP(3) " .
-                            " WHERE id = :id AND deleted_at IS NULL";
+                            " WHERE id = :id AND deleted=0";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
 
@@ -315,14 +315,14 @@ final class AuthController
                 $hash = password_hash($newPassword, PASSWORD_DEFAULT);
                 $stmt = $pdo->prepare("UPDATE user_auth " .
                                               "SET password_hash = :hash, updated_at = CURRENT_TIMESTAMP(3) " .
-                                              "WHERE user_id = :id AND provider='local' AND deleted_at IS NULL");
+                                              "WHERE user_id = :id AND provider='local' AND deleted=0");
                 $stmt->execute([':hash' => $hash, ':id' => $userId]);
             }
 
             $pdo->commit();
 
             $stmt = $pdo->prepare("SELECT id,email,display_name,preferred_language " .
-                                            "FROM users WHERE id=:id AND deleted_at IS NULL LIMIT 1");
+                                            "FROM users WHERE id=:id AND deleted=0 LIMIT 1");
             $stmt->execute([':id' => $userId]);
             $row = $stmt->fetch();
 

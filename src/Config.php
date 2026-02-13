@@ -17,4 +17,15 @@ final class Config
     public const APP_CLIENT_ID = 'wishapp.mobile';
     public const APP_SIGNATURE_KEY = 'lxCjzaqObIsISb869Swxz9xlWDQr7EjXxb9J1bYrPkAbEVtx6pfRBD79b5j2b1Aw';
     public const APP_SIGNATURE_MAX_SKEW_SECONDS = 300; // 5 minutos
+
+    public const SMTP_HOST = 'smtp.todoit.cl';
+    public const SMTP_USER = 'contact@todoit.cl';
+    public const SMTP_PASS = '135$CAae%AChd';
+    public const SMTP_PORT = 587;
+    public const SMTP_SECURE = 'ssl'; // o 'ssl'
+    public const MAIL_FROM = 'no-reply@todoit.cl';
+    public const MAIL_FROM_NAME = 'TodoIt';
+    public const APP_URL = 'https://todoit.cl'; // para links
+
+
 }
