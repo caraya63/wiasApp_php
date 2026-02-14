@@ -27,7 +27,7 @@ final class Mailer
             $mail->Subject = $subject;
             $mail->Body = $html;
             $mail->AltBody = $text !== '' ? $text : strip_tags($html);
-
+            mylog("todo lista para enviar email a: ".$to);
             return $mail->send();
         } catch (Exception $e) {
             error_log("MAIL ERROR: " . $e->getMessage());

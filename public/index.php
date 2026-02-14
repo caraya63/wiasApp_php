@@ -7,7 +7,9 @@ try {
     ini_set('log_errors', "1");
     ini_set('error_log', __DIR__ . '/../src/php-error.log');
 
+    require __DIR__ . '/../vendor/autoload.php';
     require __DIR__ . '/../src/Mailer.php';
+    require __DIR__ . '/../src/utils/mail_send.php';
     require __DIR__ . '/../src/Config.php';
     require __DIR__ . '/../src/Db.php';
     require __DIR__ . '/../src/Http.php';
@@ -36,6 +38,12 @@ try {
 
         return '/';
     }
+
+    // --- NO CACHE (API) ---
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
 
     $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
     $uri = $_SERVER['REQUEST_URI'] ?? '/';
@@ -94,6 +102,12 @@ try {
         FriendsController::createRequest($body);
         exit;
     }
+    if ($method === 'POST' && $path === '/friends/testemail') {
+        $body = Http::jsonBody();
+        FriendsController::testEmail($body);
+        exit;
+    }
+
 
     if ($method === 'POST' && preg_match('#^/friends/requests/(\d+)/accept$#', $path, $m)) {
         FriendsController::acceptRequest( (int)$m[1]);

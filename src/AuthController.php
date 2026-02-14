@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/utils/otp.php';
-require_once __DIR__ . '/utils/mail_send.php';
+
 
 final class AuthController
 {

@@ -180,24 +180,19 @@ final class FriendsController
             $me = $stMe->fetch(PDO::FETCH_ASSOC) ?: ['display_name' => 'Alguien', 'email' => ''];
 
             $targetUser = null;
-
             if ($toUserId <= 0 && $toEmail !== '') {
                 $st = $pdo->prepare("SELECT id, display_name, email FROM users WHERE email = :email AND deleted=0 LIMIT 1");
                 $st->execute([':email' => $toEmail]);
                 $targetUser = $st->fetch(PDO::FETCH_ASSOC);
+                $lang = "es";
+                if (isset($body["lang"])) $lang = $body["lang"];
 
                 if (!$targetUser) {
                     // ✅ NO existe usuario: enviar INVITACIÓN
                     $inviteLink = (Config::APP_URL ?? 'https://todoit.cl') . "/download"; // ajusta a tu landing/store
-                    $subject = "Te invitaron a WISH_APP";
-                    $html = "
-                    <p>Hola,</p>
-                    <p><b>{$me['display_name']}</b> ({$me['email']}) te invitó a unirte a <b>Wish_app</b>.</p>
-                    <p>Descárgala o entra aquí: <a href='{$inviteLink}'>{$inviteLink}</a></p>
-                ";
-
-                    $sent = Mailer::send($toEmail, $subject, $html);
-
+                    mylog("Va a enviar email a: ".$toEmail);
+                    $sent = enviarEmailInvitacion($toEmail, $lang, $inviteLink);
+                    mylog("Email enviado ");
                     Http::json(200, [
                         'status' => 'invited',
                         'emailSent' => $sent
@@ -219,13 +214,9 @@ final class FriendsController
 
             // Evitar duplicados
             $check = $pdo->prepare(
-                "SELECT * 
-             FROM friends
-             WHERE deleted=0
-               AND ((requester_user_id = :a AND addressee_user_id = :b)
-                 OR (requester_user_id = :b AND addressee_user_id = :a))
-             LIMIT 1"
-            );
+                "SELECT * FROM friends WHERE deleted=0
+                         AND ((requester_user_id = :a AND addressee_user_id = :b) OR (requester_user_id = :b AND addressee_user_id = :a))
+                         LIMIT 1");
             $check->execute([':a' => $userId, ':b' => $toUserId]);
             $existing = $check->fetch(PDO::FETCH_ASSOC);
 
@@ -250,6 +241,12 @@ final class FriendsController
             // ✅ Usuario existe: enviar NOTIFICACIÓN
             $sent = false;
             if ($targetUser && !empty($targetUser['email'])) {
+                $inviteLink = (Config::APP_URL ?? 'https://todoit.cl') . "/download"; // ajusta a tu landing/store
+                mylog("Va a enviar email a: ".$toEmail);
+                $sent = enviarEmailInvitacion($toEmail, $lang, $inviteLink,true);
+                mylog("Email enviado ");
+
+                /*
                 $subject = "Nueva solicitud de amistad en TodoIt";
                 $link = (Config::APP_URL ?? 'https://todoit.cl') . "/app"; // ajusta a deep link o ruta
                 $html = "
@@ -258,6 +255,7 @@ final class FriendsController
                 <p>Abre la app para aceptarla: <a href='{$link}'>{$link}</a></p>
             ";
                 $sent = Mailer::send($targetUser['email'], $subject, $html);
+                */
             }
 
             Http::json(201, [
@@ -269,6 +267,66 @@ final class FriendsController
         catch(Exception $e){
             mylog("CreateRequest error : " . $e->getMessage());
             Http::json(500, ['error' => 'server_error', 'message' => 'failed_to_create_request']);
+        }
+    }
+
+
+
+    public static function testEmail(array $body): void
+    {
+        try {
+            mylog("en create request");
+            Middleware::requireAppSignature();
+            $userId = Middleware::requireAuthUserId();
+
+            $toUserId = isset($body['toUserId']) ? (int)$body['toUserId'] : 0;
+
+            $toEmail = '';
+            if (isset($body['toEmail'])) $toEmail = trim((string)$body['toEmail']);
+            elseif (isset($body['email'])) $toEmail = trim((string)$body['email']);
+
+            if ($toUserId <= 0 && $toEmail === '') {
+                Http::json(400, ['error' => 'bad_request', 'message' => 'toUserId or toEmail required']);
+                return;
+            }
+            $lang = "es";
+            if (isset($body["lang"])) $lang = $body["lang"];
+
+            if ($toEmail !== '') {
+                $inviteLink = (Config::APP_URL ?? 'https://todoit.cl') . "/download"; // ajusta a tu landing/store
+                mylog("Va a enviar email a: ".$toEmail);
+                $sent = enviarEmailInvitacion($toEmail, $lang, $inviteLink);
+/*                // ✅  enviar INVITACIÓN
+
+                $subject = "PROBANDO Te invitaron a WISH_APP";
+                $html = "
+                <p>ES UNA PRUEBA ,
+                Hola,</p>
+                <p><b>alguien te invitó a unirte a <b>Wish_app</b>.</p>
+                <p>Descárgala o entra aquí: <a href='{$inviteLink}'>{$inviteLink}</a></p>
+                ";
+
+                $sent = Mailer::send($toEmail, $subject, $html);
+  */
+                mylog("Email enviado ");
+                Http::json(200, [
+                    'status' => 'invited',
+                    'emailSent' => $sent
+                ]);
+
+                return;
+
+            }
+
+            if ($toUserId === $userId) {
+                Http::json(400, ['error' => 'bad_request', 'message' => 'cannot_friend_self']);
+                return;
+            }
+
+        }
+        catch(Exception $e){
+            mylog("testEmail error : " . $e->getMessage());
+            Http::json(500, ['error' => 'server_error', 'message' => 'failed_to_testemail']);
         }
     }
 
